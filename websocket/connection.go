@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/kataras/iris/context"
+	"fmt"
 )
 
 type (
@@ -250,7 +251,7 @@ func newConnection(ctx context.Context, s *Server, underlineConn UnderlineConnec
 
 // write writes a raw websocket message with a specific type to the client
 // used by ping messages and any CloseMessage types.
-func (c *connection) write(websocketMessageType int, data []byte) {
+func (c *connection) write(websocketMessageType int, data []byte) error {
 	// for any-case the app tries to write from different goroutines,
 	// we must protect them because they're reporting that as bug...
 	c.writerMu.Lock()
@@ -266,6 +267,7 @@ func (c *connection) write(websocketMessageType int, data []byte) {
 		// if failed then the connection is off, fire the disconnect
 		c.Disconnect()
 	}
+	return err
 }
 
 // writeDefault is the same as write but the message type is the configured by c.messageType
@@ -305,7 +307,11 @@ func (c *connection) startPinger() {
 			// wait for each tick
 			<-c.pinger.C
 			// try to ping the client, if failed then it disconnects
-			c.write(websocket.PingMessage, []byte{})
+			err := c.write(websocket.PingMessage, []byte{})
+			if err!=nil{
+				//must stop to exit the loop and finish the go routine
+				break
+			}
 		}
 	}()
 }
